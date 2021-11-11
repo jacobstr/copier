@@ -133,6 +133,9 @@ class Worker:
 
             See [defaults][].
 
+        default_overrides:
+            Specify overrides to defaults during question prompts.
+
         overwrite:
             When `True`, Overwrite files that already exist, without asking.
 
@@ -159,6 +162,7 @@ class Worker:
     skip_if_exists: StrSeq = ()
     cleanup_on_error: bool = True
     defaults: bool = False
+    default_overrides: AnyByStrDict = field(default_factory=dict)
     overwrite: bool = False
     pretend: bool = False
     quiet: bool = False
@@ -348,6 +352,10 @@ class Worker:
             if var_name in result.init:
                 # Do not ask again
                 continue
+
+            if self.default_overrides.get(var_name) is not None:
+                details['default'] = self.default_overrides[var_name]
+
             questions.append(
                 Question(
                     answers=result,
