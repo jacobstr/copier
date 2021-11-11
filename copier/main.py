@@ -44,6 +44,28 @@ except ImportError:
     from backports.cached_property import cached_property
 
 
+class CopierAnswersInterrupt(Exception):
+    """CopierAnswersInterrupt is raised during interactive question prompts.
+
+    It typically follows a KeyboardInterrupt (i.e. ctrl-c) and provides an
+    opportunity for the caller to conduct additional cleanup, such as writing
+    the partially completed answers to a file.
+
+    Attributes:
+        answers:
+            AnswersMap that contains the partially completed answers object.
+
+        last_question:
+            Question representing the last_question that was asked at the time
+            the interrupt was raised.
+
+    """
+
+    def __init__(self, answers: AnswersMap, last_question: Question) -> None:
+        self.answers = answers
+        self.last_question = last_question
+
+
 @dataclass
 class Worker:
     """Copier process state manager.
@@ -337,16 +359,21 @@ class Worker:
             )
         for question in questions:
             # Display TUI and ask user interactively only without --defaults
-            new_answer = (
-                question.get_default()
-                if self.defaults
-                else unsafe_prompt(
-                    question.get_questionary_structure(), answers=result.combined
-                )[question.var_name]
-            )
+            try:
+                new_answer = (
+                    question.get_default()
+                    if self.defaults
+                    else unsafe_prompt(
+                        question.get_questionary_structure(), answers=result.combined
+                    )[question.var_name]
+                )
+            except KeyboardInterrupt:
+                raise CopierAnswersInterrupt(result, question)
+
             previous_answer = result.combined.get(question.var_name)
             if new_answer != previous_answer:
                 result.user[question.var_name] = new_answer
+
         return result
 
     @cached_property
